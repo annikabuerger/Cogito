@@ -1,0 +1,224 @@
+---
+title: "Cogito: Compare annotated genomic intervals tool"
+author: "Annika Buerger"
+package: Cogito
+date: "`r Sys.Date()`"
+output: 
+    BiocStyle::html_document
+vignette: >
+    %\VignetteEngine{knitr::rmarkdown}
+    %\VignetteIndexEntry{Cogito: Compare annotated genomic intervals tool}
+    %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Biological studies often consist of multiple conditions which are examined
+with different laboratory set ups like RNA-sequencing or ChIP-sequencing. To get
+an overview about the whole resulting data set, **Cogito** provides an automated
+and complete report about all samples and basic comparisons between all 
+different samples. This overview can be used as documentation about the data 
+set or as starting point for further custom analysis.
+
+Cogito is not meant to do detailed genetic or epigenetic analysis. But provides
+a reproducible and clear report about data sets consisting of samples of
+different conditions and mesuared with different laboratory base technologies.
+
+# Installation
+
+The package can be installed via `Bioconductor` and loaded into R by typing
+
+```{r installation of package Cogito, eval=FALSE}
+BiocManager::install("Cogito")
+library("Cogito")
+```
+
+
+```{r load package, echo = FALSE, message = FALSE}
+library("Cogito", quietly = TRUE, verbose = FALSE)
+```
+
+into the R console.
+
+# Workflow
+
+The workflow of Cogito consists of two main functions:
+
+1. `aggregateRanges(ranges, configfile, organism, name, verbose)`
+2. `summarizeRanges(aggregated.ranges, verbose)`
+
+The process is demonstrated using a small murine example. The data set from 
+King et al.^[\@ref(References)] was downloaded from the NCBI GEO database under 
+accession number 
+[GSE77004](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE77004) and 
+preprocessed^[for details on preprocessing of the data have a look at the 
+manual pages of the single data sets] to `GRanges`/`GRangesList` objects and 
+restricted to chromosome 5 to save space and processing time.
+
+This example data set is loaded with the package and consists of three data 
+objects. 
+
+The first `GRanges` object contains gene expression values from RNA-sequencing 
+with `r length(MurEpi.RNA.small)` ranges and `r ncol(mcols(MurEpi.RNA.small))` 
+columns with the corresponding expression values. Each column represents an 
+experimental condition.
+
+```{r murine example data set RNA}
+head(MurEpi.RNA.small[, 1:3])
+```
+
+The second `GRanges` object contains information about the methylation status 
+from RRBS. The object has `r length(MurEpi.RRBS.small)` ranges and 
+`r ncol(mcols(MurEpi.RRBS.small))` columns with the corresponding methylation 
+status. Where there is not information about the methylation status the value 
+is `NA`. Each column represents an experimental condition.
+
+```{r murine example data set RRBS}
+head(MurEpi.RRBS.small[, 1:3])
+```
+
+The third object is a `GRangesList` object containing 
+`r length(MurEpi.ChIP.small)` `GRanges` object. Each of this objects 
+represents an experimental condition and contains between 
+`r min(unlist(lapply(MurEpi.ChIP.small, length)))` and 
+`r max(unlist(lapply(MurEpi.ChIP.small, length)))` ranges with one column of 
+attached value each. This value is the peak score resulting from the peak 
+calling with *homer findPeaks*^[\@ref(References)]. 
+
+```{r murine example data set ChIP}
+head(MurEpi.ChIP.small[[1]])
+```
+
+The data set consists of the following samples:
+
+|           | RNA-seq | RRBS | ChIP-seq |
+|:------    |:-------:|:----:|:--------:|
+|**J1**     |    1    |  2   |    5     |
+|**TKO**    |    1    |  2   |    5     |
+|**TKO3a1** |    2    |  2   |    4     |
+|**TKO3a2** |    2    |  2   |    5     |
+|**TKO3b1** |    1    |  2   |    4     |
+|**DKO**    |    1    |  1   |    4     |
+|**DKO3a1** |    1    |  1   |    3     |
+|**DKO3a2** |    1    |  1   |    3     |
+|**DKO3b1** |    1    |  1   |    3     |
+
+: (\#tab:table) Overview of murine example data set. There are several samples 
+of different conditions (*J1*, *TKO*, ...) and base technologies (RNA-seq, 
+RRBS and ChIP-seq).
+
+The function `aggregateRanges` is called with the example data set and the 
+corresponding genomic information.
+
+```{r workflow aggregateRanges with small murine data set}
+mm9 <- TxDb.Mmusculus.UCSC.mm9.knownGene::TxDb.Mmusculus.UCSC.mm9.knownGene
+
+example.dataset <- list(ChIP = MurEpi.ChIP.small, 
+                        RNA = MurEpi.RNA.small,
+                        RRBS = MurEpi.RRBS.small)
+
+aggregated.ranges <- aggregateRanges(ranges = example.dataset,
+                                        organism = mm9,
+                                        name = "murine.example")
+```
+
+The function aggregates all provided data to the genes of the genome, given in 
+the parameter `organism`: all single `IRanges` are assigned to the closest 
+gene within a predefined default maximal distance of 100.000bp. This 
+parameter can be changed in the configuration file if necessary. Consequently,
+the columns of attached values of each provided `IRanges` object are assigned 
+to the corresponding gene. The result is one single `GRanges` object, each row 
+representing a gene and each column a sample of the provided input data.
+
+The function `aggregateRanges` returns a `list` object containing this single 
+`GRanges` objects, i.e. a `GRanges` object with rows representing genes with 
+columns of attached values `mcols` where each column contains values from a 
+specific experimental condition (such as *wildtype*) and a specific underlying 
+base technology (such as RNA-seq expression). 
+
+```{r workflow result genes of aggregateRanges with small murine data set}
+head(aggregated.ranges$genes[, c(1, 2:3, 13:14, 27:28)])
+```
+
+The return value of the function `aggregateRanges` as well contains information 
+about the supposed underlying base technologies and conditions.
+
+```{r workflow result 1 genes of aggregateRanges with small murine data set}
+lapply(aggregated.ranges$config$technologies, head, 3)
+head(lapply(aggregated.ranges$config$conditions, head, 3), 3)
+```
+
+To advance in the workflow, these two `list`s should be carefully checked and 
+corrected if necessary. Also it is possible to add user defined groups of 
+conditions to include them in the following analysis.
+
+```{r workflow summarizeRanges with small murine data set}
+summarizeRanges(aggregated.ranges = aggregated.ranges)
+```
+
+The function `summarizeRanges` does not has a return value but produces three 
+output files: 
+
+The main result is the report about the given data in a pdf. The report 
+is divided into four chapters. The introduction holds general information about 
+the underlying data set as the numbers of conditions (*wildtype* etc.) and used 
+base technologies (ChIP-seq, RNA-seq, etc.). 
+
+The first chapter contains summaries about each single column of attached 
+values, consisting of a location and a dispersion parameter as well as a plot 
+for a visual impression.
+There are `r ncol(mcols(aggregated.ranges$genes))-1` samples in total included
+in the presented murine example data set.
+
+The second chapter summarizes groups of columns of attached values which have 
+the same condition and the same base technology, for example if there are two 
+RNA-sequencing replicates of the condition *wildtpye* present.
+In the given murine example data set there are among others 2 samples of 
+methylation status examined with RRBS in the condition *J1*, 5 samples of 
+condition *J1* of ChIP-seq experiments and 2 RNA-seq samples of condition 
+*TKO3a1*, see table \@ref(tab:table). Consequentely, this results in 16 plots 
+in total.
+
+The third chapter summarizes groups of columns of attached values which are
+examined by the same base technology but do not necessarily have the same 
+underlying condition. This is visualized in an appropriate plot.
+The presented murine example has three involved base technologies: RNA-seq,
+ChIP-seq and RRBS.
+
+Finally the fourth chapter compares every column of attached value to every 
+other column of attached value. The comparison is visualized with an appropriate
+plot and a correlation test is made. Because this section may be long, the 
+report concentrates on comparisons where a significant correlation is found 
+(corrected p-value < 0.01).
+In the exemplary murine data set there are 
+`r ncol(mcols(aggregated.ranges$genes))-1` columns of attached values, so this
+results in `(61*60)/2=1830` comparisons, but of not all of them show a
+significant correlation.
+
+Besides the pdf report the function `summarizeRanges` also produces a rmd file
+with which the user may customize the report or take it as a starting point for
+further analysis, as well as a RData file which holds all used processed data.
+
+# References {#References}
+
+King AD, Huang K, Rubbi L, Liu S, Wang CY, Wang Y, Pellegrini M, Fan G. 
+**Reversible Regulation of Promoter and Enhancer Histone Landscape by DNA 
+Methylation in Mouse Embryonic Stem Cells.** 
+Cell Rep. 2016 Sep 27;17(1):289-302. doi: 10.1016/j.celrep.2016.08.083
+
+Heinz S, Benner C, Spann N, Bertolino E, Lin YC, Laslo P, Cheng JX, Murre C, 
+Singh H, Glass CK. 
+**Simple combinations of lineage-determining transcription 
+factors prime cis-regulatory elements required for macrophage and B cell 
+identities.**
+Mol Cell. 2010 May 28;38(4):576-89. doi: 10.1016/j.molcel.2010.05.004
+
+# Session Information
+
+```{r session info, echo = FALSE}
+sessionInfo()
+```

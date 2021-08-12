@@ -1,0 +1,26 @@
+Package: Cogito
+Type: Package
+Title: Compare genomic intervals tool - Automated, complete, reproducible and 
+    clear report about genomic and epigenomic data sets.
+Version: 0.99.0
+Date: 2021-08-12
+Authors@R: person("Annika", "Bürger", email="a.buerger@uni-muenster.de", 
+    role=c("cre", "aut"))
+Description: Biological studies often consist of multiple conditions 
+    which are examined with different laboratory set ups like RNA-sequencing or 
+    ChIP-sequencing. To get an overview about the whole resulting data set, 
+    Cogito provides an automated, complete, reproducible and clear report about 
+    all samples and basic comparisons between all different samples. This report
+    can be used as documentation about the data set or as starting point for 
+    further custom analysis.
+License: LGPL-3
+Encoding: UTF-8
+LazyData: TRUE
+Depends: GenomicRanges, jsonlite, GenomicFeatures, entropy
+Imports: BiocManager, rmarkdown, GenomeInfoDb, S4Vectors, AnnotationDbi, 
+    graphics, stats, utils, methods, magrittr, ggplot2, 
+    TxDb.Mmusculus.UCSC.mm9.knownGene
+biocViews: FunctionalGenomics, GeneRegulation, Software, Sequencing
+Suggests: BiocStyle, knitr, markdown, testthat (>= 3.0.0)
+VignetteBuilder: knitr
+NeedsCompilation: no

@@ -1,0 +1,22 @@
+export('summarizeRanges', 'aggregateRanges')
+import('GenomicRanges')
+importFrom('GenomicFeatures', 'genes')
+importFrom('TxDb.Mmusculus.UCSC.mm9.knownGene', 
+            'TxDb.Mmusculus.UCSC.mm9.knownGene')
+importFrom('ggplot2', 'ggplot', 'geom_bar', 'geom_boxplot', 'geom_point',
+            'geom_tile', 'xlab', 'ylab', 'labs', 'facet_wrap', 
+            'coord_cartesian', 'theme')
+importFrom('BiocManager', 'install')
+importFrom('rmarkdown', 'render')
+importFrom('AnnotationDbi', 'columns')
+importFrom('GenomeInfoDb', 'Seqinfo', 'genome')
+importFrom('entropy', 'mi.plugin', 'entropy.plugin')
+importFrom('jsonlite', 'fromJSON', 'toJSON')
+importFrom('S4Vectors', 'Rle', 'runValue', 'DataFrame',
+            'queryHits', 'subjectHits')
+importFrom('graphics', 'boxplot')
+importFrom('stats', 'chisq.test', 'cor.test', 'fisher.test',
+            'kruskal.test', 'lm', 'quantile', 'sd', 'wilcox.test')
+importFrom('utils', 'combn')
+importFrom('methods', 'is')
+importFrom('magrittr', '%>%')
