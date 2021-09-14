@@ -678,10 +678,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                 "]]$ggplotdata\nggplot(plotdata",
                 rmdSummAnn[[i]]$ggplotstring
             ),
-            paste0(
-                "Summary of attached value number ",
-                i, " of ", length(rmdSummAnn), ": ", names(dat)[i]
-            )
+            paste0("Step1-", i, "-", length(rmdSummAnn))
         ),
         append = TRUE, file = rmdFile
         )
@@ -728,11 +725,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                     "]]$dat$ggplotdata\nggplot(plotdata",
                     rmdSummGroups[[i]]$dat$ggplotstring
                 ),
-                paste0(
-                    "Summary of attached values of tracks of same condition",
-                    " and technology number ", i, " of ",
-                    length(rmdSummGroups), ": ", names(rmdSummGroups)[i]
-                )
+                paste0("Step2-", i, "-", length(rmdSummGroups))
             ),
             append = TRUE, file = rmdFile
             )
@@ -790,11 +783,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                     "]]$dat$ggplotdata\nggplot(plotdata",
                     rmdSummTechs[[i]]$dat$ggplotstring
                 ),
-                paste0(
-                    "Summary of attached values of tracks of same technology",
-                    " number ", i, " of ", length(rmdSummTechs),
-                    ": ", names(rmdSummTechs)[i]
-                )
+                paste0("Step3-", i, "-", length(rmdSummTechs))
             ),
             append = TRUE, file = rmdFile
             )
@@ -988,12 +977,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                     "]]$ggplotdata\nggplot(plotdata",
                     rmdCompAnn[[pair]]$ggplotstring
                 ),
-                paste0(
-                    "Comparison of attached values number ",
-                    pair, " of ", nrow(pairs), ": ",
-                    names(dat)[pairs[pair, 1]], " and ",
-                    names(dat)[pairs[pair, 2]]
-                )
+                paste0("Step4-", pair, "-", nrow(pairs))
             ),
             append = TRUE, file = rmdFile
             )
