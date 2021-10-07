@@ -2,9 +2,9 @@ Package: Cogito
 Type: Package
 Title: Compare genomic intervals tool - Automated, complete, reproducible and 
     clear report about genomic and epigenomic data sets.
-Version: 0.99.3
+Version: 0.99.4
 Date: 2021-10-06
-Authors@R: person("Annika", "Bürger", email="a.buerger@uni-muenster.de", 
+Authors@R: person("Annika", "Buerger", email="a.buerger@uni-muenster.de",
     role=c("cre", "aut"))
 Description: Biological studies often consist of multiple conditions 
     which are examined with different laboratory set ups like RNA-sequencing or 
