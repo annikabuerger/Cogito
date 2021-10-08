@@ -12,3 +12,11 @@ Changes in version 0.99.3 (2021-10-06)
 +   avoid usage of 'suppressMessages'
 +   adding a NEWS file
 +   split functions.R into two R files, based on what each function does
+
+Changes in version 0.99.4 (2021-10-07)
++   change author name
+
+Changes in version 0.99.5 (2021-10-08)
++   correct author name (UTF-8)
++   correct line lengths and indents
++   add eval=FALSE for pdf producing part in vignette

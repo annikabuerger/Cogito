@@ -156,7 +156,7 @@ To advance in the workflow, these two `list`s should be carefully checked and
 corrected if necessary. Also it is possible to add user defined groups of 
 conditions to include them in the following analysis.
 
-```{r workflow summarizeRanges with small murine data set}
+```{r workflow summarizeRanges with small murine data set, eval=FALSE}
 summarizeRanges(aggregated.ranges = aggregated.ranges)
 ```
 
