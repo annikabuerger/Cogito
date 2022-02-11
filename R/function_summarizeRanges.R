@@ -41,7 +41,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                         relativScale = FALSE,
                         sort = TRUE, na.rm = TRUE,
                         usedLevelsOnly = FALSE,
-                        main = paste(name, names(dat)[i])
+                        main = names(dat)[i]
                     )
             },
             nom = {
@@ -51,7 +51,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                         relativScale = FALSE,
                         sort = TRUE, na.rm = TRUE,
                         usedLevelsOnly = TRUE,
-                        main = paste(name, names(dat)[i])
+                        main = names(dat)[i]
                     )
                 locname <- names(summar$location)
                 summar$location <-
@@ -76,14 +76,14 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                         as.list(dat)[i],
                         relativScale = FALSE,
                         usedLevelsOnly = FALSE, na.rm = TRUE,
-                        main = paste(name, names(dat)[i])
+                        main = names(dat)[i]
                     )
             },
             int = ,
             rat = {
                 summar <- Cgt.plotAttributeCont(
                     as.list(dat)[i],
-                    main = paste(name, names(dat)[i]),
+                    main = names(dat)[i],
                     scale = scales[i]
                 )
                 summar$location <- Cgt.roundNicely(summar$location)
@@ -649,8 +649,10 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
             "(rep(\"ns\", nrow(ggplotdata)), ",
             "levels=c(\"ns\", \"*\", \"**\", ",
             "\"***\"), ordered=TRUE)\n",
-            "w <- ggplotdata$p.value <= 0.05 & ",
+            "w <- !is.na(ggplotdata$p.value) & ",
+            "ggplotdata$p.value <= 0.05 &\n",
             "(is.na(ggplotdata$cor) | ",
+            "ggplotdata$cor <= -0.5 | ",
             "ggplotdata$cor >= 0.5)\n",
             "ggplotdata$correlation[w] <- \"*\"\n",
             "ggplotdata$correlation[w &",
@@ -659,16 +661,30 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
             "ggplotdata$correlation[w & ",
             "ggplotdata$p.value <= 0.001] <- ",
             "\"***\"\n",
+            "ggplotdata$tech1 <- ",
+            "factor(unlist(lapply(strsplit(ggplotdata$val1, ",
+            "\".\", fixed = TRUE), \"[\", 1)))\n",
+            "ggplotdata$tech2 <- ",
+            "unlist(lapply(strsplit(ggplotdata$val2, ",
+            "\".\", fixed = TRUE), \"[\", 1))\n",
+            "ggplotdata$tech2 <- ",
+            "factor(ggplotdata$tech2, levels = ",
+            "sort(unique(ggplotdata$tech2), decreasing = TRUE))\n",
             "ggplot(ggplotdata, aes(x=val1, ",
             "y=val2, fill=correlation)) + ",
             "geom_tile() + labs(x=\"\", y=\"\") +\n",
             "  theme(axis.text.x=element_text(",
-            "angle = 45, vjust = 1, hjust=1), ",
-            "aspect.ratio=1) +\n",
+            "angle = 60, vjust = 1, hjust=1), ",
+            "strip.background = element_rect(fill=\"darkseagreen1\")) +\n",
             "  scale_fill_manual(values=c(",
             "\"lightgray\", \"gold\", \"orange\", ",
             "\"darkorange\")[summary(",
-            "ggplotdata$correlation) > 0])"
+            "ggplotdata$correlation) > 0]) +\n",
+            "scale_x_discrete(labels = {function(lab) ",
+            "unlist(lapply(strsplit(lab, \".\", TRUE), \"[\", 2))}) +\n",
+            "scale_y_discrete(labels = {function(lab) ",
+            "unlist(lapply(strsplit(lab, \".\", TRUE), \"[\", 2))}) +\n",
+            "facet_grid(tech2 ~ tech1, scales = \"free\", space=\"free\")"
         ),
         "Heatmap comparisons between attached values"
     ),
@@ -728,7 +744,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
     # only significant values (and !is.na)
     pvals <- unlist(lapply(rmdCompAnn, function(tmp) tmp$p.value))
     cors <- unlist(lapply(rmdCompAnn, function(tmp) tmp$correlation))
-    w <- which(pvals <= 0.05 & (is.na(cors) | cors >= 0.5))
+    w <- which(pvals <= 0.05 & (is.na(cors) | cors >= 0.5 | cors <= -0.5))
 
     if (length(w) > 0) {
         for (pair in w) {
@@ -758,7 +774,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                     "]]$ggplotdata\nggplot(plotdata",
                     rmdCompAnn[[pair]]$ggplotstring
                 ),
-                paste0("Step4-", pair, "-", nrow(pairs))
+                paste0("Step4-", which(pair == w), "-", length(w))
             ),
             append = TRUE, file = rmdFile
             )
@@ -882,7 +898,8 @@ Cgt.plotAttributeNominal <- function(attributes, usedLevelsOnly = TRUE,
 
     # shorten names, if all prefixes are equal to main title
     if (!is.null(main) && is.character(main) && main != "" &&
-        all(substr(names(attributes), 1, width(main)) == main)) {
+        all(substr(names(attributes), 1, width(main)) == main) &&
+        all(width(names(attributes)) > width(main))) {
         names(attributes) <-
             sub("^[[:punct:]]*", "", substr(
                 names(attributes), width(main) + 1,
@@ -982,7 +999,8 @@ Cgt.plotAttributeNominal <- function(attributes, usedLevelsOnly = TRUE,
             ggplotdata$group[ggplotdata$sample %in% groups[[group]]] <-
                 names(groups)[group]
         }
-        ggplotstring <- paste(ggplotstring, "+ facet_wrap(~group)")
+        if (length(unique(ggplotdata$group)) > 1)
+          ggplotstring <- paste(ggplotstring, "+ facet_wrap(~group)")
     }
 
     if (relativScale) {
@@ -1190,7 +1208,8 @@ Cgt.plotAttributeOrdinal <- function(attributes, usedLevelsOnly = FALSE,
             ggplotdata$group[ggplotdata$sample %in% groups[[group]]] <-
                 names(groups)[group]
         }
-        ggplotstring <- paste(ggplotstring, "+ facet_wrap(~group)")
+        if (length(unique(ggplotdata$group)) > 1)
+          ggplotstring <- paste(ggplotstring, "+ facet_wrap(~group)")
     }
 
     if (relativScale) {
@@ -1336,7 +1355,8 @@ Cgt.plotAttributeCont <- function(attributes, outline = FALSE, scale = "int",
     # ggplot
     # shorten names, if all prefixes are equal to main title
     if (!is.null(main) && is.character(main) && main != "" &&
-        all(substr(names(attributes), 1, width(main)) == main)) {
+        all(substr(names(attributes), 1, width(main)) == main) &&
+        all(width(names(attributes)) > width(main))) {
         names(attributes) <-
             sub("^[[:punct:]]*", "", substr(
                 names(attributes), width(main) + 1,
@@ -1732,7 +1752,7 @@ Cgt.plotComparisonCatToCat <- function(datComp, scale1 = "nom",
     ggplotdata <- data.frame(
         val1 = rep(rownames(plotdata), ncol(plotdata)),
         val2 = rep(colnames(plotdata), each = nrow(plotdata)),
-        number = as.vector(plotdata)
+        quantity = as.vector(plotdata)
     )
     colnames(ggplotdata)[seq_len(2)] <- names(datComp)
     if (scale1 == "ord") {
@@ -1749,7 +1769,7 @@ Cgt.plotComparisonCatToCat <- function(datComp, scale1 = "nom",
     }
     ggplotstring <- paste0(
         ", aes(x=", colnames(ggplotdata)[1], ", y=",
-        colnames(ggplotdata)[2], ", fill=number)) + ",
+        colnames(ggplotdata)[2], ", fill=quantity)) + ",
         "geom_tile() + labs(title=\"", plottitle,
         "\", subtitle=\"", plotsubtitle, "\")"
     )

@@ -1,3 +1,6 @@
+Changes in version 1.1.1 (2022-02-11)
++ minor bug fixes
+
 Changes in version 0.99.0 (2021-08-12)
 + Submitted to Bioconductor
 
