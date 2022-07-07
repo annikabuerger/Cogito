@@ -5,7 +5,7 @@
 \author{Annika Bürger}
 \usage{
     aggregateRanges(ranges, configfile = NULL, organism = NULL,
-                    name = "", verbose = FALSE)
+                    referenceRanges = NULL, name = "", verbose = FALSE)
 }
 \arguments{
     \item{ranges}{
@@ -13,20 +13,24 @@
         with names in "RRBS|DNA|CNV|RNA|CHiP"}
     \item{configfile}{
         character, path to configuration file in json format}
-    \item{organism}{TxDb or OrganismDb object}
+    \item{organism}{TxDb or OrganismDb object, default value NULL}
+    \item{referenceRanges}{list of GRanges, GRangesList or
+        CompressedGRangesList with length one and name of reference,
+        default value NULL}
     \item{name}{character, default value ""}
     \item{verbose}{logical, default value FALSE}
 }
 \value{
-    List object with three members: One GRanges object with one gene per line 
-    and one column per sample, configuration information, and name.
+    List object with three members: One GRanges object with one gene
+    or range of given reference per line and one column per sample,
+    configuration information, and name.
 }
 \seealso{
     \code{\link{summarizeRanges}}
 }
 \description{
     Aggregates multiple GRanges objects with present columns of attached 
-    values (mcols) to genes of given organism.
+    values (mcols) to genes or ranges of given reference of given organism.
 }
 \examples{
 mm9 <- TxDb.Mmusculus.UCSC.mm9.knownGene::TxDb.Mmusculus.UCSC.mm9.knownGene

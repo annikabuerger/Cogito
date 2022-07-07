@@ -4,16 +4,17 @@
 \title{Summarize Aggregated GRanges}
 \author{Annika Bürger}
 \usage{
-    summarizeRanges(aggregated.ranges, verbose = FALSE)
+    summarizeRanges(aggregated.ranges, outputFormat = "pdf", verbose = FALSE)
 }
 \arguments{
     \item{aggregated.ranges}{list of GRanges, cofiguration information, and name
         for example result from function Cogito::summarizeRanges}
+    \item{outputFormat}{character, can be pdf or html default value pdf}
     \item{verbose}{logical, default value FALSE}
 }
 \value{
-    No return value, only side effects: creation of a rmd, a pdf and a data 
-    file (RData).
+    No return value, only side effects: creation of a rmd, a pdf or html and a
+    data file (RData).
 }
 \seealso{
     \code{\link{aggregateRanges}}
@@ -52,18 +53,20 @@ ranges.ChIP.control <-
             seqinfo = GenomeInfoDb::seqinfo(mm9),
             score = round(runif(15, 5, 90)))
 
-example.dataset <- list(RNA = GRangesList(control = ranges.RNA.control, 
-                                            condition = ranges.RNA.condition), 
+example.dataset <- list(RNA = GRangesList(control = ranges.RNA.control,
+                                            condition = ranges.RNA.condition),
                         ChIP = ranges.ChIP.control)
 
 aggregated.ranges <- aggregateRanges(ranges = example.dataset,
-                                        organism = mm9, 
-                                        name = "art.example", 
+                                        organism = mm9,
+                                        name = "art.example",
                                         verbose = TRUE)
 
 # adding information about conditions
 aggregated.ranges$config$conditions <- list(condition = c("RNA.condition.expr"),
-                                            control = c("RNA.control.expr", 
+                                            control = c("RNA.control.expr",
                                                         "ChIP.score"))
-summarizeRanges(aggregated.ranges = aggregated.ranges, verbose = TRUE)
+summarizeRanges(aggregated.ranges = aggregated.ranges,
+                outputFormat = "pdf",
+                verbose = TRUE)
 }

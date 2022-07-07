@@ -1,4 +1,5 @@
-summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
+summarizeRanges <- function(aggregated.ranges, outputFormat = "pdf",
+                            verbose = FALSE) {
     if (!is.list(aggregated.ranges) ||
         !("genes" %in% names(aggregated.ranges)) ||
         !methods::is(aggregated.ranges$genes, "GRanges")) {
@@ -284,6 +285,17 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
             )
         # adjust p-value with bonferroni
         rmdCompAnn[[pair]]$p.value <- nrow(pairs) * rmdCompAnn[[pair]]$p.value
+        # conditions
+        if (!is.null(config$conditions)) {
+            rmdCompAnn[[pair]]$cond1 <-
+                names(which(unlist(lapply(config$conditions,
+                                            function(cond) colnames(dat)[
+                                                pairs[pair, 1]] %in% cond))))[1]
+            rmdCompAnn[[pair]]$cond2 <-
+                names(which(unlist(lapply(config$conditions,
+                                            function(cond) colnames(dat)[
+                                                pairs[pair, 2]] %in% cond))))[1]
+        }
     }
     if (verbose) {
         message("save data")
@@ -298,23 +310,17 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
     if (verbose) {
         message("write report")
     }
-    outputFormat <- "PDF"
+    if (!is.character(outputFormat) ||
+        length(grep(outputFormat, c("pdf", "html"), ignore.case = TRUE)) != 1)
+        outputFormat <- "pdf"
+    outputFormat <- tolower(outputFormat)
     rmdFile <- paste0(getwd(), "/", Sys.Date(), "_", name, "_custom.rmd")
-    if (outputFormat == "PDF") {
-        write(paste0(
-            "---\ntitle: \"", name, " - Cogito report ",
-            Sys.Date(), "\"\noutput: pdf_document\n",
-            "fontsize: 10pt\nlinkcolor: blue\n---\n"
-        ),
+    write(paste0(
+        "---\ntitle: \"", name, " - Cogito report ",
+        Sys.Date(), "\"\noutput: ", outputFormat, "_document\n",
+        "fontsize: 10pt\nlinkcolor: blue\n---\n"),
         file = rmdFile
-        )
-    } else {
-        write(paste0(
-            "---\ntitle: \"", name, " - Cogito report ",
-            Sys.Date(), "\"\noutput:\nhtml_document:\n",
-            "css: style.css\n---\n"
-        ), file = rmdFile)
-    }
+    )
 
     write(Cgt.rcodestring(
         paste0("knitr::opts_chunk$set(echo = FALSE, out.width='60%', ",
@@ -436,7 +442,8 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                 append = TRUE, file = rmdFile
             )
         }
-        write(paste0("\n### ", names(dat)[i], "{#", names(dat)[i], "}"),
+        write(paste0("\n### ", names(dat)[i], "{#",
+                        gsub(" ", "", names(dat)[i]), "}"),
             append = TRUE, file = rmdFile
         )
         write(paste0(
@@ -496,7 +503,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
             write("\n\\newpage", append = TRUE, file = rmdFile)
             write(paste0(
                 "\n## ", names(rmdSummGroups)[i],
-                "{#group", names(rmdSummGroups)[i], "}"
+                "{#group", gsub(" ", "", names(rmdSummGroups)[i]), "}"
             ),
             append = TRUE, file = rmdFile
             )
@@ -554,7 +561,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
             write("\n\\newpage", append = TRUE, file = rmdFile)
             write(paste0(
                 "\n## ", names(rmdSummTechs)[i],
-                "{#technology", names(rmdSummTechs)[i], "}"
+                "{#technology", gsub(" ", "", names(rmdSummTechs)[i]), "}"
             ),
             append = TRUE, file = rmdFile
             )
@@ -599,7 +606,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
     corMatPvals <- matrix(0, ncol(dat) - 1, ncol(dat) - 1)
     for (pair in seq_len(nrow(pairs))) {
         corMat[pairs[pair, 1], ncol(dat) - pairs[pair, 2] + 1] <-
-            Cgt.tooltipstring(Cgt.intlinkstring(
+            Cgt.intlinkstring(
                 ifelse(is.na(rmdCompAnn[[pair]]$p.value) ||
                             rmdCompAnn[[pair]]$p.value > 0.05 ||
                     (!is.na(rmdCompAnn[[pair]]$correlation) &&
@@ -611,16 +618,6 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
                 )
                 ),
                 paste0("comp", pair)
-            ),
-            paste(
-                ifelse(is.na(rmdCompAnn[[pair]]$p.value) ||
-                            rmdCompAnn[[pair]]$p.value > 0.05,
-                    "not significant",
-                    Cgt.roundNicely(rmdCompAnn[[pair]]$p.value)
-                ),
-                names(rmdCompAnn[[pair]]$p.value)
-            ),
-            format = outputFormat
             )
         corMatPvals[pairs[pair, 1], ncol(dat) - pairs[pair, 2] + 1] <-
             rmdCompAnn[[pair]]$p.value
@@ -751,7 +748,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
             write(paste0(
                 "\n## Compare ", names(dat)[pairs[pair, 1]],
                 " with ", names(dat)[pairs[pair, 2]],
-                "{#comp", pair, "}"
+                "{#comp", gsub(" ", "", pair), "}"
             ),
             append = TRUE, file = rmdFile
             )
@@ -789,8 +786,7 @@ summarizeRanges <- function(aggregated.ranges, verbose = FALSE) {
 
     ## save rmd-file and generate html or PDF ####
     outfile <- paste0(
-        getwd(), "/", Sys.Date(), "_", name, "_report.",
-        ifelse(outputFormat == "PDF", "pdf", "html")
+        getwd(), "/", Sys.Date(), "_", name, "_report.", outputFormat
     )
 
     rmarkdown::render(rmdFile, output_file = outfile, quiet = !verbose)
@@ -917,30 +913,29 @@ Cgt.plotAttributeNominal <- function(attributes, usedLevelsOnly = TRUE,
     # set y-axis label to postfix, if it is equal in all samples
     # and shorten names
     xlab <- "value"
-    if (length(attributes) > 1) {
-        postfix <-
-            unique(unlist(lapply(
-                strsplit(names(attributes), "[[:punct:]]"), function(sstr) {
-                    sstr[length(sstr)]
-                }
-            )))
-        if (length(postfix) == 1) {
-            xlab <- postfix
-            names(attributes) <-
-                sub(
-                    "[[:punct:]]*$", "",
-                    substr(
-                        names(attributes), 1,
-                        width(names(attributes)) - width(postfix)
-                    )
+    postfix <-
+        unique(unlist(lapply(
+            strsplit(names(attributes), "[[:punct:]]"), function(sstr) {
+                sstr[length(sstr)]
+            }
+        )))
+    if (length(postfix) == 1 &&
+            all(width(names(attributes)) - width(postfix) > 1)) {
+        xlab <- postfix
+        names(attributes) <-
+            sub(
+                "[[:punct:]]*$", "",
+                substr(
+                    names(attributes), 1,
+                    width(names(attributes)) - width(postfix)
                 )
-            groups <- lapply(groups, function(group) {
-                sub("[[:punct:]]*$", "", substr(
-                    group, 1,
-                    width(group) - width(postfix)
-                ))
-            })
-        }
+            )
+        groups <- lapply(groups, function(group) {
+            sub("[[:punct:]]*$", "", substr(
+                group, 1,
+                width(group) - width(postfix)
+            ))
+        })
     }
     rownames(plotdata) <- names(attributes)
 
@@ -957,54 +952,50 @@ Cgt.plotAttributeNominal <- function(attributes, usedLevelsOnly = TRUE,
 
     # ggplot2
     ggplotdata <- data.frame(
-        quantity = as.vector(plotdata),
+        Quantity = as.vector(plotdata),
         value = factor(rep(colnames(plotdata),
             each = nrow(plotdata)
         ),
         levels = colnames(plotdata)
         ),
-        sample = rep(rownames(plotdata), ncol(plotdata))
+        Sample = rep(rownames(plotdata), ncol(plotdata))
     )
-    if (max(m <- (apply(plotdata / apply(plotdata, 1, sum), 2, min))) > 0.9) {
-        if (relativScale) {
-            m <- max(m)
-        } else {
-            m <- min(plotdata[, which.max(m)])
-        }
-        ggplotstring <- paste0(
-            ", aes(x=value, y=quantity, fill=sample)) + \n",
-            "geom_bar(data=plotdata %>% mutate(ss=\"all\"),",
-            " stat=\"identity\", position=position_dodge())",
-            " + \ngeom_bar(data=plotdata %>% filter(",
-            "quantity <", m, ") %>% mutate(ss=\"subset\"), ",
-            "stat=\"identity\", ",
-            "position=position_dodge()) +",
-            " \nfacet_wrap(~ ss, scales=\"free_y\") + xlab(\"", xlab, "\")"
-        )
-    } else {
-        ggplotstring <- paste0(
-            ", aes(x=value, y=quantity, fill=sample)) + ",
-            "geom_bar(stat=\"identity\", ",
-            "position=position_dodge()) + xlab(\"", xlab, "\")"
-        )
-    }
+
+    ggplotstring <- paste0(
+        ", aes_string(x=\"", "value", "\", ",
+        "y=\"Quantity\", fill=\"Sample\")) + \n\t",
+        "geom_bar(stat=\"identity\", ",
+        "position=position_dodge()) + \n\txlab(\"", xlab, "\")"
+    )
 
     if (!is.null(main) && is.character(main) && main != "") {
-        ggplotstring <- paste0(ggplotstring, " + labs(title=\"", main, "\")")
+        ggplotstring <- paste0(ggplotstring, " + \n\tlabs(title=\"",
+                               gsub("[[:punct:]]", " ", main), "\")")
     }
 
     if (!is.null(groups)) {
         ggplotdata$group <- NA
         for (group in seq_along(groups)) {
-            ggplotdata$group[ggplotdata$sample %in% groups[[group]]] <-
+            ggplotdata$group[ggplotdata$Sample %in% groups[[group]]] <-
                 names(groups)[group]
         }
         if (length(unique(ggplotdata$group)) > 1)
-          ggplotstring <- paste(ggplotstring, "+ facet_wrap(~group)")
+          ggplotstring <- paste(ggplotstring, "+ \n\tfacet_wrap(~group)")
     }
 
+    cols <- c("#d9a072", "#2a7f31", "#b74c6d", "#83755b", "#39c594",
+                "#f3cf94", "#ce3cbb", "#c7b0ee", "#f0cd4c", "#4542b2",
+                "#d1eba3", "#aaebdc", "#8b371f", "#266f6a", "#8a73f4",
+                "#96bc28", "#69fad3", "#713c81", "#9eed81", "#c22528",
+                "#f12861", "#ff852d")
+    cols <- paste0("c(\"", paste0(paste0(cols, collapse = "\", \""),
+                                    collapse = ","), "\")")
+    ggplotstring <- paste0(ggplotstring,
+                            " + \n\tscale_fill_manual(values = ", cols ,
+                            ")")
+
     if (relativScale) {
-        ggplotdata$quantity <- as.vector(plotdata / apply(plotdata, 1, sum))
+        ggplotdata$Quantity <- as.vector(plotdata / apply(plotdata, 1, sum))
     }
 
     result <- list(
@@ -1137,7 +1128,8 @@ Cgt.plotAttributeOrdinal <- function(attributes, usedLevelsOnly = FALSE,
     # ggplot
     # shorten names, if all prefixes are equal to main title
     if (!is.null(main) && is.character(main) && main != "" &&
-        all(substr(names(attributes), 1, width(main)) == main)) {
+        all(substr(names(attributes), 1, width(main)) == main) &&
+        all(width(names(attributes)) > width(main))) {
         names(attributes) <-
             sub("^[[:punct:]]*", "", substr(
                 names(attributes), width(main) + 1,
@@ -1152,68 +1144,81 @@ Cgt.plotAttributeOrdinal <- function(attributes, usedLevelsOnly = FALSE,
             }
         )
     }
-    # set y-axis label to postfix, if it is equal in all samples
+    # set x-axis label to postfix, if it is equal in all samples
     # and shorten names
     xlab <- "value"
-    if (length(attributes) > 1) {
-        postfix <-
-            unique(unlist(lapply(
-                strsplit(names(attributes), "[[:punct:]]"), function(sstr) {
-                    sstr[length(sstr)]
-                }
-            )))
-        if (length(postfix) == 1) {
-            xlab <- postfix
-            names(attributes) <-
-                sub(
-                    "[[:punct:]]*$", "",
-                    substr(
-                        names(attributes), 1,
-                        width(names(attributes)) - width(postfix)
-                    )
+    postfix <-
+        unique(unlist(lapply(
+            strsplit(names(attributes), "[[:punct:]]"), function(sstr) {
+                sstr[length(sstr)]
+            }
+        )))
+    if (length(postfix) == 1 &&
+        all(width(names(attributes)) - width(postfix) > 1)) {
+        xlab <- postfix
+        names(attributes) <-
+            sub(
+                "[[:punct:]]*$", "",
+                substr(
+                    names(attributes), 1,
+                    width(names(attributes)) - width(postfix)
                 )
-            groups <- lapply(groups, function(group) {
-                sub("[[:punct:]]*$", "", substr(
-                    group, 1,
-                    width(group) - width(postfix)
-                ))
-            })
-        }
+            )
+        groups <- lapply(groups, function(group) {
+            sub("[[:punct:]]*$", "", substr(
+                group, 1,
+                width(group) - width(postfix)
+            ))
+        })
     }
     rownames(plotdata) <- names(attributes)
 
     ggplotdata <- data.frame(
-        quantity = as.vector(plotdata),
+        Quantity = as.vector(plotdata),
         value = factor(
             rep(colnames(plotdata),
                 each = nrow(plotdata)
             ),
             colnames(plotdata)
         ),
-        sample = rep(rownames(plotdata), ncol(plotdata))
+        Sample = rep(rownames(plotdata), ncol(plotdata))
     )
+
     ggplotstring <- paste0(
-        ", aes(x=value, y=quantity, fill=sample)) + ",
+        ", aes_string(x=\"", "value", "\", ",
+        "y=\"Quantity\", fill=\"Sample\")) + \n\t",
         "geom_bar(stat=\"identity\", ",
-        "position=position_dodge()) + xlab(\"", xlab, "\")"
+        "position=position_dodge()) + \n\txlab(\"", xlab, "\")"
     )
 
     if (!is.null(main) && is.character(main) && main != "") {
-        ggplotstring <- paste0(ggplotstring, " + labs(title=\"", main, "\")")
+        ggplotstring <- paste0(ggplotstring, " + \n\tlabs(title=\"",
+                               gsub("[[:punct:]]", " ", main), "\")")
     }
 
     if (!is.null(groups)) {
         ggplotdata$group <- NA
         for (group in seq_along(groups)) {
-            ggplotdata$group[ggplotdata$sample %in% groups[[group]]] <-
+            ggplotdata$group[ggplotdata$Sample %in% groups[[group]]] <-
                 names(groups)[group]
         }
         if (length(unique(ggplotdata$group)) > 1)
-          ggplotstring <- paste(ggplotstring, "+ facet_wrap(~group)")
+          ggplotstring <- paste(ggplotstring, "+ \n\tfacet_wrap(~group)")
     }
 
+    cols <- c("#d9a072", "#2a7f31", "#b74c6d", "#83755b", "#39c594",
+              "#f3cf94", "#ce3cbb", "#c7b0ee", "#f0cd4c", "#4542b2",
+              "#d1eba3", "#aaebdc", "#8b371f", "#266f6a", "#8a73f4",
+              "#96bc28", "#69fad3", "#713c81", "#9eed81", "#c22528",
+              "#f12861", "#ff852d")
+    cols <- paste0("c(\"", paste0(paste0(cols, collapse = "\", \""),
+                                  collapse = ","), "\")")
+    ggplotstring <- paste0(ggplotstring,
+                           " + \n\tscale_fill_manual(values = ", cols ,
+                           ")")
+
     if (relativScale) {
-        ggplotdata$quantity <- as.vector(plotdata / apply(plotdata, 1, sum))
+        ggplotdata$Quantity <- as.vector(plotdata / apply(plotdata, 1, sum))
     }
 
     if (length(attributes) == 1) {
@@ -1374,34 +1379,33 @@ Cgt.plotAttributeCont <- function(attributes, outline = FALSE, scale = "int",
     # set y-axis label to postfix, if it is equal in all samples
     # and shorten names
     ylab <- "value"
-    if (length(attributes) > 1) {
-        postfix <-
-            unique(unlist(lapply(
-                strsplit(names(attributes), "[[:punct:]]"), function(sstr) {
-                    sstr[length(sstr)]
-                }
-            )))
-        if (length(postfix) == 1) {
-            ylab <- postfix
-            names(attributes) <-
-                sub(
-                    "[[:punct:]]*$", "",
-                    substr(
-                        names(attributes), 1,
-                        width(names(attributes)) - width(postfix)
-                    )
+    postfix <-
+        unique(unlist(lapply(
+            strsplit(names(attributes), "[[:punct:]]"), function(sstr) {
+                sstr[length(sstr)]
+            }
+        )))
+    if (length(postfix) == 1 &&
+        all(width(names(attributes)) - width(postfix) > 1)) {
+        ylab <- postfix
+        names(attributes) <-
+            sub(
+                "[[:punct:]]*$", "",
+                substr(
+                    names(attributes), 1,
+                    width(names(attributes)) - width(postfix)
                 )
-            groups <- lapply(groups, function(group) {
-                sub("[[:punct:]]*$", "", substr(
-                    group, 1,
-                    width(group) - width(postfix)
-                ))
-            })
-        }
+            )
+        groups <- lapply(groups, function(group) {
+            sub("[[:punct:]]*$", "", substr(
+                group, 1,
+                width(group) - width(postfix)
+            ))
+        })
     }
     ggplotdata <- data.frame(
         value = unlist(attributes),
-        sample = factor(rep(
+        Sample = factor(rep(
             names(attributes),
             lapply(attributes, length)
         ))
@@ -1410,29 +1414,43 @@ Cgt.plotAttributeCont <- function(attributes, outline = FALSE, scale = "int",
     if (!is.null(groups)) {
         ggplotdata$group <- NA
         for (group in seq_along(groups)) {
-            ggplotdata$group[ggplotdata$sample %in% groups[[group]]] <-
+            ggplotdata$group[ggplotdata$Sample %in% groups[[group]]] <-
                 names(groups)[group]
         }
     }
     ggplotstring <- paste0(
-        ", aes(x=sample, y=value",
-        ifelse(!is.null(groups), ", fill=group", ""),
-        ")) + geom_boxplot(", ifelse(outline, ")",
+        ", aes_string(x=\"Sample\", y=\"value\"",
+        ifelse(!is.null(groups), ", fill=\"group\"", ""), ")) + \n\t",
+        "geom_boxplot(", ifelse(outline, ")",
             paste0(
-                "outlier.shape=NA) + coord_cartesian(",
+                "outlier.shape=NA) + \n\tcoord_cartesian(",
                 "ylim=c(", min(tempDat[, 1]), ", ",
                 max(tempDat[, 5]), "))"
             )
-        ), " + xlab(\"sample\") + ylab(\"", ylab, "\")"
+        ), " + \n\txlab(\"Sample\") + ylab(\"", ylab, "\")"
     )
+
+    if (!is.null(groups)) {
+        cols <- c("#d9a072", "#2a7f31", "#b74c6d", "#83755b", "#39c594",
+                    "#f3cf94", "#ce3cbb", "#c7b0ee", "#f0cd4c", "#4542b2",
+                    "#d1eba3", "#aaebdc", "#8b371f", "#266f6a", "#8a73f4",
+                    "#96bc28", "#69fad3", "#713c81", "#9eed81", "#c22528",
+                    "#f12861", "#ff852d")
+        cols <- paste0("c(\"", paste0(paste0(cols, collapse = "\", \""),
+                                        collapse = ","), "\")")
+        ggplotstring <- paste0(ggplotstring, " + \n\t",
+                                "scale_fill_manual(values = ", cols , ")")
+    }
+
     if (length(attributes) > 1){
         ggplotstring <- 
-            paste(ggplotstring, "+ theme(axis.text.x = ",
+            paste(ggplotstring, "+ \n\ttheme(axis.text.x = ",
                     "element_text(angle = 45, vjust = 1, hjust = 1))")
     }
 
     if (!is.null(main) && is.character(main) && main != "") {
-        ggplotstring <- paste0(ggplotstring, " + labs(title=\"", main, "\")")
+        ggplotstring <- paste0(ggplotstring, " + \n\tlabs(title=\"",
+                               gsub("[[:punct:]]", " ", main), "\")")
     }
 
     result$ggplotdata <- ggplotdata
@@ -1507,17 +1525,20 @@ Cgt.plotComparisonContToCont <- function(datComp, scale1 = "int",
     mylm <- lm(datComp[[2]] ~ datComp[[1]])
     sign <- (!is.na(pval) && pval <= 0.05)
 
-    plottitle <- paste("compare", names(datComp)[1], "with", names(datComp)[2])
+    plottitle <- paste(gsub("[[:punct:]]", " ", names(datComp)[1]), "vs.",
+                        gsub("[[:punct:]]", " ", names(datComp)[2]))
     plotsubtitle <- paste(names(cor), round(cor, 3))
 
-    ggplotdata <- as.data.frame(datComp)
+    ggplotdata <- as.data.frame(datComp) # replaces blank with dot
     ggplotdata <-
         ggplotdata[!is.na(ggplotdata[, 1]) & !is.na(ggplotdata[, 2]), ]
     ggplotstring <- paste0(
-        ", aes(x=", names(datComp)[1], ", y=",
-        names(datComp)[2], ")) + geom_point() + ",
-        "labs(title=\"", plottitle, "\", subtitle=\"",
-        plotsubtitle, "\")"
+        ", aes_string(x=\"", colnames(ggplotdata)[1], "\", y=\"",
+        colnames(ggplotdata)[2], "\")) + \n\tgeom_point() + \n\t",
+        "labs(title=\"", plottitle, "\", ",
+        "subtitle=\"", plotsubtitle, "\", ",
+        "x=\"", names(datComp)[1], "\", ",
+        "y=\"", names(datComp)[2], "\")"
     )
 
     return(list(
@@ -1528,7 +1549,8 @@ Cgt.plotComparisonContToCont <- function(datComp, scale1 = "int",
 }
 
 Cgt.plotComparisonCatToCont <- function(datComp, scale1 = "nom",
-                                        scale2 = "int", outline = FALSE) {
+                                        scale2 = "int", outline = FALSE,
+                                        na.rm = TRUE) {
     if (!is.list(datComp) || !length(datComp) >= 2 ||
         length(datComp[[1]]) != length(datComp[[2]]) ||
         sum(!is.na(datComp[[1]])) == 0 || sum(!is.na(datComp[[2]])) == 0) {
@@ -1606,7 +1628,8 @@ Cgt.plotComparisonCatToCont <- function(datComp, scale1 = "nom",
 
     # how long whiskers depends on range
     range <- 1.5
-    plottitle <- paste("compare", names(datComp)[1], "with", names(datComp)[2])
+    plottitle <- paste(gsub("[[:punct:]]", " ", names(datComp)[1]), "vs.",
+                        gsub("[[:punct:]]", " ", names(datComp)[2]))
     plotsubtitle <- ifelse(is.na(pval), "", paste(names(pval), round(pval, 3)))
     bxpdata <- boxplot(plotdata, range = range, plot = FALSE)
 
@@ -1619,16 +1642,47 @@ Cgt.plotComparisonCatToCont <- function(datComp, scale1 = "nom",
 
     ggplotdata <- as.data.frame(datComp)
     ggplotdata <- ggplotdata[!is.na(ggplotdata[, 2]), ] # not displayable
+    # remove group 'NA'
+    if (na.rm)
+        ggplotdata <- ggplotdata[!is.na(ggplotdata[, 1]), ]
+    pairwiseComb <- length(unique(ggplotdata[, 1]))
+    pairwiseCombText <- ""
+    if (pairwiseComb >= 2) {
+        pairwiseComb <- combn(pairwiseComb, 2, simplify = FALSE)[
+            order(combn(pairwiseComb, 2)[2,] - combn(pairwiseComb, 2)[1, ])]
+        pairwiseComb <- paste0("c(",
+                                lapply(pairwiseComb, paste0, collapse=", "),
+                                ")", collapse = ", ")
+        pairwiseComb <- paste0("list(", pairwiseComb, ")")
+        pairwiseCombText <- paste0("geom_signif(comparisons = ",
+                                    pairwiseComb, ", ",
+                                    "margin_top = 0, tip_length = 0, ",
+                                    "textsize = 3, ",
+                                    "map_signif_level = TRUE, ",
+                                    "y_position = ", max(bxpdata[, 5])*1.1,
+                                    ", step_increase = ",
+                                    0.05/(max(datComp[[2]], na.rm = TRUE) -
+                                            min(datComp[[2]], na.rm = TRUE)) *
+                                        (max(bxpdata[, 5])-
+                                            min(bxpdata[, 1])),
+                                    ") + \n\t")
+    }
+
     ggplotstring <-
         paste0(
-            ", aes(x=", names(datComp)[1], ", y=",
-            names(datComp)[2], ")) + ", "labs(title=\"", plottitle,
-            "\", subtitle=\"", plotsubtitle, "\") + geom_boxplot(",
+            ", aes_string(x=\"", colnames(ggplotdata)[1], "\", ",
+            "y=\"", colnames(ggplotdata)[2], "\")) + \n\t",
+            "labs(title=\"", plottitle, "\", ",
+            "subtitle=\"", plotsubtitle, "\", ",
+            "x=\"", names(datComp)[1], "\", ",
+            "y=\"", names(datComp)[2], "\") + \n\t",
+            "geom_boxplot(",
             ifelse(outline, ")", paste0(
-                "outlier.shape=NA) + ",
+                "outlier.shape=NA) + \n\t",
+                pairwiseCombText,
                 "coord_cartesian(ylim=c(",
                 min(bxpdata[, 1]), ", ",
-                max(bxpdata[, 5]), "))"
+                max(bxpdata[, 5])*1.2, "))"
             ))
         )
 
@@ -1746,15 +1800,16 @@ Cgt.plotComparisonCatToCat <- function(datComp, scale1 = "nom",
         entropy::entropy.plugin(colSums(plotdata))
     )
 
-    plottitle <- paste("compare", names(datComp)[1], "with", names(datComp)[2])
+    plottitle <- paste(gsub("[[:punct:]]", " ", names(datComp)[1]), "vs.",
+                        gsub("[[:punct:]]", " ", names(datComp)[2]))
     plotsubtitle <- paste(names(pval), round(pval, 3))
 
     ggplotdata <- data.frame(
         val1 = rep(rownames(plotdata), ncol(plotdata)),
         val2 = rep(colnames(plotdata), each = nrow(plotdata)),
-        quantity = as.vector(plotdata)
+        Quantity = as.vector(plotdata)
     )
-    colnames(ggplotdata)[seq_len(2)] <- names(datComp)
+    colnames(ggplotdata)[seq_len(2)] <- gsub(" ", ".", names(datComp))
     if (scale1 == "ord") {
         ggplotdata[, 1] <- factor(ggplotdata[, 1],
             levels = levels(datComp[[1]]),
@@ -1768,10 +1823,13 @@ Cgt.plotComparisonCatToCat <- function(datComp, scale1 = "nom",
         )
     }
     ggplotstring <- paste0(
-        ", aes(x=", colnames(ggplotdata)[1], ", y=",
-        colnames(ggplotdata)[2], ", fill=quantity)) + ",
-        "geom_tile() + labs(title=\"", plottitle,
-        "\", subtitle=\"", plotsubtitle, "\")"
+        ", aes_string(x=\"", colnames(ggplotdata)[1], "\", ",
+        "y=\"", colnames(ggplotdata)[2], "\", ",
+        "fill=\"Quantity\")) + \n\t",
+        "geom_tile() + \n\tlabs(title=\"", plottitle, "\", ",
+        "subtitle=\"", plotsubtitle, "\", ",
+        "x=\"", names(datComp)[1], "\", ",
+        "y=\"", names(datComp)[2], "\")"
     )
 
     return(list(
@@ -1978,25 +2036,11 @@ Cgt.rcodestring <- function(code, label = "", echo = NA) {
     }
 }
 
-Cgt.tooltipstring <- function(tooltip, tooltiptext, format = "html") {
-    if (!is.character(tooltip) || !is.character(tooltiptext)) {
-        stop("Cogito::Cgt::tooltipstring")
-    }
-    if (is.character(format) && format == "PDF") {
-        return(tooltip)
-    } else {
-        return(paste0(
-            "<span class=\"tt\">", tooltip, "<span class=\"ttt\">",
-            tooltiptext, "</span></span>"
-        ))
-    }
-}
-
 Cgt.intlinkstring <- function(text, linkto) {
     if ((!is.character(text) && !is.factor(text)) || !is.character(linkto)) {
         stop("Cogito::Cgt.intlinkstring")
     }
-    return(paste0("[", text, "](#", linkto, ")"))
+    return(paste0("[", text, "](#", gsub(" ", "", linkto), ")"))
 }
 
 Cgt.tablestring <- function(data, dotsAfter = integer(), row.names = TRUE,

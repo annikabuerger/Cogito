@@ -48,8 +48,9 @@ into the R console.
 
 The workflow of Cogito consists of two main functions:
 
-1. `aggregateRanges(ranges, configfile, organism, name, verbose)`
-2. `summarizeRanges(aggregated.ranges, verbose)`
+1. `aggregateRanges(ranges, configfile, organism,`
+`referenceRanges, name, verbose)`
+2. `summarizeRanges(aggregated.ranges, outputFormat, verbose)`
 
 The process is demonstrated using a small murine example. The data set from 
 King et al.^[\@ref(References)] was downloaded from the NCBI GEO database under 
@@ -163,7 +164,7 @@ summarizeRanges(aggregated.ranges = aggregated.ranges)
 The function `summarizeRanges` does not has a return value but produces three 
 output files: 
 
-The main result is the report about the given data in a pdf. The report 
+The main result is the report about the given data in a pdf (or html). The report
 is divided into four chapters. The introduction holds general information about 
 the underlying data set as the numbers of conditions (*wildtype* etc.) and used 
 base technologies (ChIP-seq, RNA-seq, etc.). 
@@ -216,6 +217,10 @@ Singh H, Glass CK.
 factors prime cis-regulatory elements required for macrophage and B cell 
 identities.**
 Mol Cell. 2010 May 28;38(4):576-89. doi: 10.1016/j.molcel.2010.05.004
+
+The color scheme used by Cogito was generated with help of:
+[iWantHue](https://medialab.github.io/iwanthue/) by Mathieu Jacomy at the at
+the [Sciences-Po Medialab](http://medialab.sciences-po.fr/)
 
 # Session Information
 

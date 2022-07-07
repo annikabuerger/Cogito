@@ -1,3 +1,11 @@
+Changes in version 1.3.1 (2022-06-29)
++ adapted color scheme
++ added option to choose between pdf and html output
++ adapted appearance of plot labels
++ adapted track names in example data set
++ added option to set custom reference set of ranges
++ allowed blanks in track names
+
 Changes in version 1.1.1 (2022-02-11)
 + minor bug fixes
 

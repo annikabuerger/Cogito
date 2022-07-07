@@ -2,7 +2,7 @@
 # names of ranges have to be in "RRBS|DNA|CVN|RNA|ChIP"
 # organism has to be a TxDb or OrganismDb
 aggregateRanges <- function(ranges, configfile = NULL, 
-                            organism = NULL,
+                            organism = NULL, referenceRanges = NULL,
                             name = "", verbose = FALSE) {
     if (!is.list(ranges)) {
         stop("Cogito::aggregateRanges parameter ranges is no list")
@@ -45,7 +45,6 @@ aggregateRanges <- function(ranges, configfile = NULL,
         )
     }
     genome <- organism
-    
     if (is.na(verbose) | !is.logical(verbose)) {
         verbose <- FALSE
     }
@@ -72,12 +71,15 @@ aggregateRanges <- function(ranges, configfile = NULL,
         }
     }
 
-    if ("SYMBOL" %in% AnnotationDbi::columns(genome)) {
-        genes <- sort(
+    if ((is.list(referenceRanges) || is(referenceRanges, "GRangesList")) &&
+        (length(referenceRanges) >= 1 && is(referenceRanges[[1]], "GRanges"))) {
+        reference <- referenceRanges[[1]]
+    } else if ("SYMBOL" %in% AnnotationDbi::columns(genome)) {
+        reference <- sort(
             GenomicFeatures::genes(genome, columns = c("SYMBOL"))
         )
     } else {
-        genes <- sort(
+        reference <- sort(
             GenomicFeatures::genes(genome)
         )
     }
@@ -92,7 +94,7 @@ aggregateRanges <- function(ranges, configfile = NULL,
 
     maxdist <- configlist$MaxDistToGene
 
-    ## MEAN: distribute RRBS/RNA/DNA/CNV over genes
+    ## MEAN: distribute RRBS/RNA/DNA/CNV over reference
     ## (numeric: mean, ordered: median, factor: modus, logical: any)
     l <- ranges[grep("RRBS|RNA|DNA|CNV", names(ranges), ignore.case = TRUE)]
     for (ll in seq_along(l)) {
@@ -113,22 +115,22 @@ aggregateRanges <- function(ranges, configfile = NULL,
                         ), colnames(mcols(tmp))
                     )
                 if (all(unlist(lapply(mcols(tmp), is.numeric)))) {
-                    genes <- Cgt.aggr(genes, tmp,
+                    reference <- Cgt.aggr(reference, tmp,
                         scale = "numeric",
                         mode = "mean", maxdist
                     )
                 } else if (all(unlist(lapply(mcols(tmp), is.ordered)))) {
-                    genes <- Cgt.aggr(genes, tmp,
+                    reference <- Cgt.aggr(reference, tmp,
                         scale = "ordered",
                         mode = "median", maxdist
                     )
                 } else if (all(unlist(lapply(mcols(tmp), is.factor)))) {
-                    genes <- Cgt.aggr(genes, tmp,
+                    reference <- Cgt.aggr(reference, tmp,
                         scale = "factor",
                         mode = "modus", maxdist
                     )
                 } else if (all(unlist(lapply(mcols(tmp), is.logical)))) {
-                    genes <- Cgt.aggr(genes, tmp,
+                    reference <- Cgt.aggr(reference, tmp,
                         scale = "logical",
                         mode = "any", maxdist
                     )
@@ -138,7 +140,7 @@ aggregateRanges <- function(ranges, configfile = NULL,
             }
         }
     }
-    ## MAX: distribute ChIP over genes
+    ## MAX: distribute ChIP over reference
     ## (numeric: max, ordered: max, factor/logical: modus)
     l <- ranges[grep("ChIP", names(ranges), ignore.case = TRUE)]
     for (ll in seq_along(l)) {
@@ -159,22 +161,22 @@ aggregateRanges <- function(ranges, configfile = NULL,
                         ), colnames(mcols(tmp))
                     )
                 if (all(unlist(lapply(mcols(tmp), is.numeric)))) {
-                    genes <- Cgt.aggr(genes, tmp,
+                    reference <- Cgt.aggr(reference, tmp,
                         scale = "numeric",
                         mode = "max", maxdist
                     )
                 } else if (all(unlist(lapply(mcols(tmp), is.ordered)))) {
-                    genes <- Cgt.aggr(genes, tmp,
+                    reference <- Cgt.aggr(reference, tmp,
                         scale = "ordered",
                         mode = "max", maxdist
                     )
                 } else if (all(unlist(lapply(mcols(tmp), is.factor)))) {
-                    genes <- Cgt.aggr(genes, tmp,
+                    reference <- Cgt.aggr(reference, tmp,
                         scale = "factor",
                         mode = "modus", maxdist
                     )
                 } else if (all(unlist(lapply(mcols(tmp), is.logical)))) {
-                    genes <- Cgt.aggr(genes, tmp,
+                    reference <- Cgt.aggr(reference, tmp,
                         scale = "logical",
                         mode = "modus", maxdist
                     )
@@ -186,8 +188,8 @@ aggregateRanges <- function(ranges, configfile = NULL,
     }
 
     configlist$technologies <- lapply(names(ranges), function(tech) {
-        colnames(mcols(genes))[
-            grep(paste0(tech, "."), colnames(mcols(genes)), fixed = TRUE)
+        colnames(mcols(reference))[
+            grep(paste0(tech, "."), colnames(mcols(reference)), fixed = TRUE)
         ]
     })
     names(configlist$technologies) <- names(ranges)
@@ -200,21 +202,22 @@ aggregateRanges <- function(ranges, configfile = NULL,
     }
 
     # guess conditions from names
-    shortcolnames <- unlist(lapply(strsplit(colnames(mcols(genes))[-1],
+    shortcolnames <- unlist(lapply(strsplit(colnames(mcols(reference))[-1],
                                             ".", fixed=TRUE), "[[", 2))
     shorttechs <- lapply(configlist$technologies, function(tech) {
         unlist(lapply(strsplit(tech, ".", fixed=TRUE), "[[", 2))})
     groupsIdxs <- Cgt.guessConditions(shortcolnames, shorttechs)
     configlist$conditions <- lapply(groupsIdxs, function(group) {
-        colnames(mcols(genes))[-1][group]})
+        colnames(mcols(reference))[-1][group]})
 
     write(jsonlite::toJSON(configlist, pretty = TRUE),
         append = FALSE,
         file = configfile
     )
 
-    genes <- genes[!apply(mcols(genes), 1, function(row) all(is.na(row[-1]))), ]
-    return(list(genes = genes, config = configlist, name = name))
+    reference <- reference[!apply(mcols(reference), 1,
+                                  function(row) all(is.na(row[-1]))), ]
+    return(list(genes = reference, config = configlist, name = name))
 }
 
 ################################################################################
@@ -406,7 +409,7 @@ Cgt.modus <- function(x, na.rm = TRUE) {
     return(levels(x)[which.max(summary(x)[-length(summary(x))])])
 }
 
-Cgt.guessConditions <- function(names, techs=list(), all=FALSE){
+Cgt.guessConditions <- function(names, techs = list(), all = FALSE){
     if (!is.character(names)){
         stop("Cogito::Cgt.guessConditions")
     }
@@ -414,7 +417,7 @@ Cgt.guessConditions <- function(names, techs=list(), all=FALSE){
     if (length(names) == 0) {
         stop("Cogito::Cgt.guessConditions")
     }
-    posgroups <- unique(unlist(strsplit(names, "[[:punct:]]")))
+    posgroups <- unique(unlist(strsplit(names, "[[:punct:]]| ")))
     if (is.logical(all) && all)
         posgroups <- unique(unlist(lapply(names, function(x) {
             apply(combn(seq_len(nchar(x)), 2), 2, function(pair) {
@@ -422,7 +425,7 @@ Cgt.guessConditions <- function(names, techs=list(), all=FALSE){
             })
         })))
     wgroups <- lapply(posgroups, function(x) {
-        grep(paste0(x, "([[:punct:]]|$)"), names, fixed=FALSE)})
+        grep(paste0(x, "([[:punct:]]| |$)"), names, fixed=FALSE)})
     posgroups <- posgroups[w <- unlist(lapply(wgroups, length)) > 1]
     wgroups <- wgroups[w]
     groups <- unique(wgroups)
@@ -430,7 +433,7 @@ Cgt.guessConditions <- function(names, techs=list(), all=FALSE){
         n <- posgroups[unlist(lapply(wgroups, identical, y=x))]
         return(n[which.max(nchar(n))])
     })
-    w <- grep("^[[:punct:]]", names(groups))
+    w <- grep("^([[:punct:]]| )", names(groups))
     todel <- integer()
     if (length(w) > 0) {
         for (g in w) {
@@ -445,7 +448,7 @@ Cgt.guessConditions <- function(names, techs=list(), all=FALSE){
     if (length(todel) > 0)
         groups <- groups[-todel]
     todel <- integer()
-    w <- grep("[[:punct:]]$", names(groups))
+    w <- grep("([[:punct:]]| )$", names(groups))
     if (length(w) > 0) {
         for (g in w) {
             newname <- substr(names(groups)[g], 1, nchar(names(groups)[g])-1)
@@ -460,7 +463,7 @@ Cgt.guessConditions <- function(names, techs=list(), all=FALSE){
         groups <- groups[-todel]
     groups <- groups[nchar(names(groups)) > 1]
     groups <- groups[unlist(lapply(names(groups), function(name) {
-        any(width(strsplit(name, "[[:punct:]]|[[:digit:]]")[[1]]) != 0)
+        any(width(strsplit(name, "[[:punct:]]|[[:digit:]]| ")[[1]]) != 0)
     }))]
     if (length(groups) == 0)
         return(groups)
